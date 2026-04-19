@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>HydroML — Drainage Network & Flood Risk System</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <link rel="stylesheet" href="/static/css/style.css"/>
+</head>
+<body>
+
+<!-- ═══════════════════════ TOP BAR ═══════════════════════ -->
+<header class="topbar">
+  <div class="logo">
+    <svg class="logo-icon" viewBox="0 0 40 40" fill="none">
+      <path d="M5 32 Q10 20 20 22 Q28 24 35 10" stroke="#4ecdc4" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+      <path d="M2 36 Q8 28 15 30 Q22 32 30 18 Q34 12 38 8" stroke="#a8e6cf" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+      <circle cx="20" cy="22" r="3" fill="#4ecdc4" opacity="0.7"/>
+      <circle cx="30" cy="18" r="2" fill="#ff6b6b" opacity="0.8"/>
+    </svg>
+    <span class="logo-text">HYDRO<span class="accent">ML</span></span>
+  </div>
+  <nav class="topnav">
+    <button class="nav-btn active" data-panel="upload">Upload DEM</button>
+    <button class="nav-btn" data-panel="results" id="resultsBtn" disabled>Analysis</button>
+    <button class="nav-btn" data-panel="flood" id="floodBtn" disabled>Flood Risk</button>
+    <button class="nav-btn" data-panel="stats" id="statsBtn" disabled>Statistics</button>
+  </nav>
+  <div class="status-chip" id="statusChip">
+    <span class="dot"></span>
+    <span id="chipText">Ready</span>
+  </div>
+</header>
+
+<!-- ═══════════════════════ MAIN LAYOUT ═══════════════════════ -->
+<main class="main-layout">
+
+  <!-- ── LEFT SIDEBAR ── -->
+  <aside class="sidebar" id="sidebar">
+
+    <!-- UPLOAD PANEL -->
+    <section class="panel active" id="panel-upload">
+      <h2 class="panel-title">Upload DEM</h2>
+
+      <div class="upload-zone" id="uploadZone">
+        <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+          <path d="M24 8v24M14 18l10-10 10 10" stroke="#4ecdc4" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M8 36h32" stroke="#4ecdc4" stroke-width="2" stroke-linecap="round" opacity="0.5"/>
+        </svg>
+        <p class="upload-label">Drop GeoTIFF here</p>
+        <p class="upload-sub">or click to browse</p>
+        <input type="file" id="fileInput" accept=".tif,.tiff" hidden/>
+      </div>
+      <p id="uploadStatus" class="hint-text"></p>
+
+      <div class="divider"><span>or</span></div>
+
+      <button class="btn-primary" id="syntheticBtn">
+        ⚙ Generate Synthetic DEM
+      </button>
+
+      <div class="param-group">
+        <label>Synthetic DEM Size</label>
+        <input type="range" id="demSize" min="64" max="512" step="64" value="256"/>
+        <span id="demSizeLabel" class="range-label">256 × 256</span>
+      </div>
+
+      <div class="param-group">
+        <label>Rainfall Intensity (mm)</label>
+        <input type="range" id="rainfallSlider" min="10" max="300" step="5" value="50"/>
+        <span id="rainfallLabel" class="range-label">50 mm</span>
+      </div>
+
+      <button class="btn-process" id="processBtn" disabled>
+        ▶ Run ML Pipeline
+      </button>
+    </section>
+
+    <!-- RESULTS PANEL -->
+    <section class="panel" id="panel-results">
+      <h2 class="panel-title">Layer Controls</h2>
+      <div class="layer-list" id="layerList">
+        <label class="layer-item">
+          <input type="checkbox" class="layer-toggle" data-layer="hillshade" checked/>
+          <span class="layer-swatch" style="background:linear-gradient(135deg,#444,#eee)"></span>
+          Hillshade
+        </label>
+        <label class="layer-item">
+          <input type="checkbox" class="layer-toggle" data-layer="dem" checked/>
+          <span class="layer-swatch" style="background:linear-gradient(135deg,#440154,#fde725)"></span>
+          Elevation (DEM)
+        </label>
+        <label class="layer-item">
+          <input type="checkbox" class="layer-toggle" data-layer="stream_prob" checked/>
+          <span class="layer-swatch" style="background:linear-gradient(135deg,#001a4d,#1e96ff)"></span>
+          Ensemble Stream Prob.
+        </label>
+        <label class="layer-item">
+          <input type="checkbox" class="layer-toggle" data-layer="cnn_prob"/>
+          <span class="layer-swatch" style="background:linear-gradient(135deg,#004d40,#80cbc4)"></span>
+          CNN Probability
+        </label>
+        <label class="layer-item">
+          <input type="checkbox" class="layer-toggle" data-layer="xgb_prob"/>
+          <span class="layer-swatch" style="background:linear-gradient(135deg,#1a237e,#9fa8da)"></span>
+          XGBoost Probability
+        </label>
+        <label class="layer-item">
+          <input type="checkbox" class="layer-toggle" data-layer="stream_mask"/>
+          <span class="layer-swatch" style="background:#1e78ff"></span>
+          ML Stream Network
+        </label>
+        <label class="layer-item">
+          <input type="checkbox" class="layer-toggle" data-layer="classical_labels"/>
+          <span class="layer-swatch" style="background:#00c853"></span>
+          Classical D8 Labels
+        </label>
+      </div>
+
+      <div class="opacity-control">
+        <label>Layer Opacity</label>
+        <input type="range" id="opacitySlider" min="0.1" max="1" step="0.05" value="0.75"/>
+        <span id="opacityLabel" class="range-label">75%</span>
+      </div>
+    </section>
+
+    <!-- FLOOD PANEL -->
+    <section class="panel" id="panel-flood">
+      <h2 class="panel-title">Flood Risk</h2>
+
+      <label class="layer-item" style="margin-bottom:1rem">
+        <input type="checkbox" class="layer-toggle" data-layer="flood_risk" checked/>
+        <span class="layer-swatch" style="background:linear-gradient(135deg,#1b5e20,#f57f17,#b71c1c)"></span>
+        Flood Risk Index
+      </label>
+
+      <div class="risk-legend">
+        <div class="risk-bar"></div>
+        <div class="risk-labels">
+          <span>Low</span><span>Medium</span><span>High</span>
+        </div>
+      </div>
+
+      <div class="param-group">
+        <label>Update Rainfall (mm)</label>
+        <input type="range" id="rainfallUpdate" min="10" max="300" step="5" value="50"/>
+        <span id="rainfallUpdateLabel" class="range-label">50 mm</span>
+      </div>
+
+      <div class="rainfall-chart-wrap">
+        <p class="chart-title">Historical Rainfall (mm/month)</p>
+        <canvas id="rainfallChart" height="120"></canvas>
+      </div>
+    </section>
+
+    <!-- STATS PANEL -->
+    <section class="panel" id="panel-stats">
+      <h2 class="panel-title">Analysis Stats</h2>
+      <div id="statsGrid" class="stats-grid"></div>
+      <div class="download-group">
+        <p class="panel-title" style="font-size:.75rem;margin-top:1.2rem">Downloads</p>
+        <button class="btn-dl" id="dlStreamTif">⬇ Stream Prob (GeoTIFF)</button>
+        <button class="btn-dl" id="dlFloodTif">⬇ Flood Risk (GeoTIFF)</button>
+        <button class="btn-dl" id="dlStats">⬇ Statistics (JSON)</button>
+      </div>
+    </section>
+
+  </aside>
+
+  <!-- ── MAP ── -->
+  <div class="map-wrap">
+    <div id="map"></div>
+
+    <!-- Progress overlay -->
+    <div class="progress-overlay" id="progressOverlay" hidden>
+      <div class="progress-card">
+        <div class="progress-spinner"></div>
+        <p class="progress-msg" id="progressMsg">Initialising …</p>
+        <div class="progress-bar-track">
+          <div class="progress-bar-fill" id="progressFill"></div>
+        </div>
+        <span id="progressPct">0%</span>
+      </div>
+    </div>
+
+    <!-- Coordinates tooltip -->
+    <div class="coords-bar" id="coordsBar">Hover over map</div>
+  </div>
+
+</main>
+
+<!-- Scripts -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="/static/js/app.js"></script>
+</body>
+</html>

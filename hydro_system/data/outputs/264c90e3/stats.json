@@ -1,0 +1,13 @@
+{
+  "dem_min": 0.0,
+  "dem_max": 561.1920776367188,
+  "dem_mean": 283.3942565917969,
+  "stream_pixels": 0,
+  "stream_fraction": 0.0,
+  "mean_stream_prob": 0.2337,
+  "high_risk_pct": 11.79,
+  "med_risk_pct": 74.14,
+  "low_risk_pct": 14.07,
+  "grid_rows": 256,
+  "grid_cols": 256
+}
